@@ -8,7 +8,9 @@ from django.conf import settings
 from google_auth_oauthlib.flow import Flow
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
-
+from django.http import JsonResponse, HttpResponseRedirect
+from .oauth.gmail_auth import get_authorization_url
+from django.views.decorators.csrf import csrf_exempt
 from .models import GmailAccount
 
 # Configura las rutas importantes
@@ -59,3 +61,15 @@ def gmail_auth_callback(request):
     )
 
     return JsonResponse({'message': 'Cuenta de Gmail conectada con éxito'})
+
+# email_connector/views.py
+
+
+# Almacena temporalmente los states de OAuth (en producción usar DB o sesión segura)
+oauth_sessions = {}
+
+@csrf_exempt
+def auth_url(request):
+    auth_url, state, flow = get_authorization_url()
+    oauth_sessions[state] = flow  # ← Usa el `state` devuelto directamente
+    return JsonResponse({'url': auth_url})
