@@ -5,14 +5,15 @@ from google.genai import types
 from google.api_core.exceptions import GoogleAPIError  # Para manejo de errores
 
 load_dotenv()
+print("API Key detectada:", os.environ.get("GEMINI_API_KEY"))
+
 
 def main():
     client = genai.Client(
         api_key=os.environ.get("GEMINI_API_KEY"),
     )
 
-    # Usa este modelo si no tienes acceso a la versión preview
-    model = "gemini-1.5-pro-latest"
+    model = "gemini-2.5-pro-preview-03-25"
 
     system_instruction = [
         types.Part.from_text(text="""Eres un agente inteligente especializado en gestión de correos electrónicos y mensajes de plataformas como Gmail, Outlook, Facebook Messenger y WhatsApp. 
