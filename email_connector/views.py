@@ -1,3 +1,61 @@
-from django.shortcuts import render
+import os
+import json
+from datetime import datetime, timedelta
+from django.http import JsonResponse, HttpResponseRedirect
+from django.shortcuts import redirect
+from django.views.decorators.csrf import csrf_exempt
+from django.conf import settings
+from google_auth_oauthlib.flow import Flow
+from google.oauth2.credentials import Credentials
+from google.auth.transport.requests import Request
 
-# Create your views here.
+from .models import GmailAccount
+
+# Configura las rutas importantes
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CLIENT_SECRET_FILE = os.path.join(BASE_DIR, 'email_connector', 'oauth', 'client_secret.json')
+SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
+
+
+def gmail_auth_init(request):
+    flow = Flow.from_client_secrets_file(
+        CLIENT_SECRET_FILE,
+        scopes=SCOPES,
+        redirect_uri='http://localhost:8000/email_connector/oauth/callback'
+    )
+    auth_url, _ = flow.authorization_url(prompt='consent')
+    return HttpResponseRedirect(auth_url)
+
+
+@csrf_exempt
+def gmail_auth_callback(request):
+    code = request.GET.get('code')
+    if not code:
+        return JsonResponse({'error': 'No code provided'}, status=400)
+
+    flow = Flow.from_client_secrets_file(
+        CLIENT_SECRET_FILE,
+        scopes=SCOPES,
+        redirect_uri='http://localhost:8000/email_connector/oauth/callback'
+    )
+    flow.fetch_token(code=code)
+
+    credentials = flow.credentials
+
+    # Simulación: en producción esto debe ligarse al usuario autenticado
+    user = User.objects.first()  # ⚠️ temporal, usa request.user si tienes login
+
+    GmailAccount.objects.update_or_create(
+        user=user,
+        email=credentials.id_token.get('email'),
+        defaults={
+            'access_token': credentials.token,
+            'refresh_token': credentials.refresh_token,
+            'token_uri': credentials.token_uri,
+            'client_id': credentials.client_id,
+            'client_secret': credentials.client_secret,
+            'token_expiry': datetime.utcnow() + timedelta(seconds=credentials.expiry - datetime.utcnow().timestamp())
+        }
+    )
+
+    return JsonResponse({'message': 'Cuenta de Gmail conectada con éxito'})
