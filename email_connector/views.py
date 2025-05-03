@@ -12,11 +12,18 @@ from django.http import JsonResponse, HttpResponseRedirect
 from .oauth.gmail_auth import get_authorization_url
 from django.views.decorators.csrf import csrf_exempt
 from .models import GmailAccount
+from django.contrib.auth.models import User  # <-- Añade esta línea
 
 # Configura las rutas importantes
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CLIENT_SECRET_FILE = os.path.join(BASE_DIR, 'email_connector', 'oauth', 'client_secret.json')
-SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
+SCOPES = [
+    "https://www.googleapis.com/auth/gmail.readonly",
+    "openid",
+    "https://www.googleapis.com/auth/userinfo.email",
+    "email"
+]
+
 
 
 def gmail_auth_init(request):
