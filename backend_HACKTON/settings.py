@@ -77,8 +77,12 @@ WSGI_APPLICATION = 'backend_HACKTON.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'postgres',
+        'USER': 'postgres.egpoxjmcflxqsywpiznw',
+        'PASSWORD': 'HackMilo0325@',
+        'HOST': 'aws-0-us-east-2.pooler.supabase.com',
+        'PORT': 6543,
     }
 }
 
@@ -123,8 +127,3 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-
-
-from decouple import config
-
-GEMINI_API_KEY = config('GEMINI_API_KEY')
