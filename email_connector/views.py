@@ -14,7 +14,12 @@ from django.views.decorators.csrf import csrf_exempt
 from .models import GmailAccount
 from django.contrib.auth.models import User  # <-- Añade esta línea
 import jwt  # <-- Añade esta importación al inicio del archivo
+from supabase import create_client
 
+supabase = create_client(
+    'https://egpoxjmcflxqsywpiznw.supabase.co',
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVncG94am1jZmx4cXN5d3Bpem53Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDYyOTIxMzksImV4cCI6MjA2MTg2ODEzOX0.hNSzbpLTQNhrWgHP4UghidLB1Qo3qA2fsNRIp49hUNI'
+)
 
 # Configura las rutas importantes
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -37,54 +42,79 @@ def gmail_auth_init(request):
     return HttpResponseRedirect(auth_url)
 
 
-
 @csrf_exempt
 def gmail_auth_callback(request):
+    # 1. Validar el código de autorización
     code = request.GET.get('code')
     if not code:
         return JsonResponse({'error': 'No code provided'}, status=400)
 
-    flow = Flow.from_client_secrets_file(
-        CLIENT_SECRET_FILE,
-        scopes=SCOPES,
-        redirect_uri='http://localhost:8000/email_connector/oauth/callback'
-    )
-    flow.fetch_token(code=code)
-
-    credentials = flow.credentials
-    print("Credentials object:", dir(credentials))  # Lista todos los atributos y métodos
-    print("Credentials expiry:", credentials.expiry)  # Verifica si existe
-    # Decodifica el id_token para obtener el email
-    id_token = credentials.id_token
-    if not id_token:
-        return JsonResponse({'error': 'ID token missing'}, status=400)
-
+    # 2. Configurar el flujo OAuth
     try:
-        # Decodifica el JWT sin verificar la firma (solo para prueba)
-        id_info = jwt.decode(id_token, options={"verify_signature": False})  # <-- Aquí se corrige el error
-        email = id_info.get('email')
+        flow = Flow.from_client_secrets_file(
+            CLIENT_SECRET_FILE,
+            scopes=SCOPES,
+            redirect_uri='http://localhost:8000/email_connector/oauth/callback'
+        )
+        flow.fetch_token(code=code)
+        credentials = flow.credentials
     except Exception as e:
-        return JsonResponse({'error': f'Error decoding ID token: {str(e)}'}, status=400)
+        return JsonResponse({'error': f'Error en el flujo OAuth: {str(e)}'}, status=400)
 
+    # 3. Decodificar el ID token para obtener el email
+    try:
+        id_info = jwt.decode(credentials.id_token, options={"verify_signature": False})
+        email = id_info.get('email')
+        if not email:
+            return JsonResponse({'error': 'Email no encontrado en el ID token'}, status=400)
+    except Exception as e:
+        return JsonResponse({'error': f'Error decodificando ID token: {str(e)}'}, status=400)
 
-    user = User.objects.first()  # Temporal: reemplazar con request.user
+    # 4. Guardar en Supabase (CORRECCIÓN PRINCIPAL)
+    try:
+        # Primero verifica si el registro existe
+        existing_record = supabase.table('user_oauth_providers') \
+            .select('*') \
+            .eq('user_email', email) \
+            .execute()
 
-    GmailAccount.objects.update_or_create(
-        user=user,
-        email=email,  # <-- Usa la variable decodificada
-        defaults={
+        data = {
+            'user_email': email,
+            'provider': 'google',
             'access_token': credentials.token,
             'refresh_token': credentials.refresh_token,
             'token_uri': credentials.token_uri,
             'client_id': credentials.client_id,
             'client_secret': credentials.client_secret,
-            'token_expiry': credentials.expiry  # ← Usa directamente el datetime de expiración
+            'token_expiry': credentials.expiry.isoformat() if credentials.expiry else None
         }
-    )
 
-    return JsonResponse({'message': 'Cuenta de Gmail conectada con éxito'})
-# email_connector/views.py
+        if existing_record.data:
+            # Actualizar registro existente
+            response = supabase.table('user_oauth_providers') \
+                .update(data) \
+                .eq('user_email', email) \
+                .execute()
+        else:
+            # Insertar nuevo registro
+            response = supabase.table('user_oauth_providers') \
+                .insert(data) \
+                .execute()
 
+        # Verificar errores
+        if hasattr(response, 'error'):
+            raise Exception(response.error)
+
+        return JsonResponse({
+            'message': 'Autenticación exitosa',
+            'data': {
+                'email': email,
+                'provider': 'google'
+            }
+        })
+
+    except Exception as e:
+        return JsonResponse({'error': f'Error al guardar en Supabase: {str(e)}'}, status=500)
 
 # Almacena temporalmente los states de OAuth (en producción usar DB o sesión segura)
 oauth_sessions = {}
