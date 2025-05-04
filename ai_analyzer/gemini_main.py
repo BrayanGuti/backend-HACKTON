@@ -13,10 +13,10 @@ def main():
         api_key=os.environ.get("GEMINI_API_KEY"),
     )
 
-    model = "gemini-2.5-pro-preview-03-25"
+    model = "gemini-2.5-pro-exp-03-25"
 
     system_instruction = [
-        types.Part.from_text(text="""Eres un agente inteligente especializado en gestión de correos electrónicos y mensajes de plataformas como Gmail, Outlook, Facebook Messenger y WhatsApp. 
+        types.Part.from_text(text="""Eres un agente inteligente especializado en gestión de correos electrónicos. 
 
 Tu objetivo es ayudar al usuario a organizar, resumir, redactar respuestas, clasificar o reenviar mensajes según su contenido y prioridad. 
 
@@ -26,7 +26,7 @@ No incluyas información que no esté en el mensaje. Si el usuario pide algo que
 """)
     ]
 
-    print("🤖 Gemini chatbot listo. Escribe tu mensaje (o 'salir' para terminar):")
+    print("Mess-IA chatbot listo. Escribe tu mensaje (o 'salir' para terminar):")
 
     while True:
         user_input = input("Tú: ")
